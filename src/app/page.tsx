@@ -1,7 +1,10 @@
 import React from 'react';
+<<<<<<< HEAD
 // We comment out the Seeder so it doesn't accidentally run again
 // import SeedButton from "@/components/SeedButton"; 
 
+=======
+>>>>>>> be242829e40be23b611ec77cf5997886b72f17fa
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
@@ -31,7 +34,10 @@ export default function Home() {
               <button className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold transition shadow-lg">
                 Find Hostels
               </button>
+<<<<<<< HEAD
               {/* Note: The "Admin Login" button is GONE. */}
+=======
+>>>>>>> be242829e40be23b611ec77cf5997886b72f17fa
             </div>
         </div>
         <p className="text-center text-indigo-200 text-xs mt-4 opacity-70">
