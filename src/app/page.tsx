@@ -1,4 +1,5 @@
 import React from 'react';
+import HostelCard from "@/components/HostelCard";
 
 
 
