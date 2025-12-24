@@ -220,7 +220,7 @@ export default function HostelDetails() {
               onClick={() => setIsBookingOpen(true)}
               className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg transition shadow-lg transform active:scale-95"
             >
-              Book Now
+              Reserve Seat
             </button>
 
             <p className="text-center text-xs text-gray-400 mt-4">
