@@ -7,8 +7,9 @@ import { Hostel } from '@/types';
 import { auth } from '@/lib/firebase'; // Ensure this matches your firebase.ts path
 import { onAuthStateChanged } from 'firebase/auth';
 import { getBookings, updateBookingStatus } from '@/lib/firebaseAPI';
+import { uploadImage } from '@/lib/cloudinary';
 import { Booking } from '@/types';
-import { Plus, Edit2, Trash2, Search, Building2, MapPin, Phone, IndianRupee, BedDouble, X, Check, Clock, User, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Building2, MapPin, Phone, IndianRupee, BedDouble, X, Check, Clock, User, Calendar, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 export default function AdminDashboard() {
   // 1. Get Global Data & Functions from Context
@@ -33,8 +34,13 @@ export default function AdminDashboard() {
     price: 0,
     contactNumber: '',
     seatsAvailable: 0,
-    type: 'men'
+    type: 'men',
+    images: []
   });
+
+  // New State for Image Upload
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   // --- SECURITY GUARD: CHECK LOGIN STATUS ---
   useEffect(() => {
@@ -66,38 +72,75 @@ export default function AdminDashboard() {
   // --- HANDLERS ---
   const handleOpenAdd = () => {
     setIsEditMode(false);
-    setFormData({ name: '', location: '', price: 0, contactNumber: '', seatsAvailable: 0, type: 'men' });
+    setFormData({ name: '', location: '', price: 0, contactNumber: '', seatsAvailable: 0, type: 'men', images: [] });
+    setSelectedFiles([]);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (hostel: Hostel) => {
     setIsEditMode(true);
     setFormData(hostel);
+    setSelectedFiles([]);
     setIsModalOpen(true);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const removeExistingImage = (indexToRemove: number) => {
+    const currentImages = formData.images || [];
+    const newImages = currentImages.filter((_, index) => index !== indexToRemove);
+    setFormData({ ...formData, images: newImages });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading(true);
 
-    if (isEditMode && formData.id) {
-      // SCENARIO A: Updating
-      await triggerUpdate(formData.id, formData);
-      alert("Hostel Updated Successfully!");
-    } else {
-      // SCENARIO B: Creating
-      const newHostel: Hostel = {
-        ...formData as Hostel,
-        id: Date.now().toString(),
-        verified: true,
-        amenities: ['WiFi', 'Mess'],
-        totalSeats: formData.seatsAvailable || 10,
-        images: ['/images/hostel1.jpg'],
-        description: 'New hostel added via Admin Dashboard'
-      };
-      await addHostel(newHostel);
-      alert("New Hostel Created!");
+    try {
+      // 1. Upload new images if any
+      let uploadedUrls: string[] = [];
+      if (selectedFiles.length > 0) {
+        uploadedUrls = await Promise.all(selectedFiles.map(file => uploadImage(file)));
+      }
+
+      // 2. Combine with existing images
+      const finalImages = [...(formData.images || []), ...uploadedUrls];
+
+      // fallback image if none exist
+      if (finalImages.length === 0) {
+        finalImages.push('/images/hostel1.jpg');
+      }
+
+      const finalData = { ...formData, images: finalImages };
+
+      if (isEditMode && formData.id) {
+        // SCENARIO A: Updating
+        await triggerUpdate(formData.id, finalData);
+        alert("Hostel Updated Successfully!");
+      } else {
+        // SCENARIO B: Creating
+        const newHostel: Hostel = {
+          ...finalData as Hostel,
+          id: Date.now().toString(),
+          verified: true,
+          amenities: ['WiFi', 'Mess'],
+          totalSeats: finalData.seatsAvailable || 10,
+          description: 'New hostel added via Admin Dashboard'
+        };
+        await addHostel(newHostel);
+        alert("New Hostel Created!");
+      }
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
+      alert(`Failed to save: ${error.message || "Unknown error"}`);
+    } finally {
+      setUploading(false);
     }
-    setIsModalOpen(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -524,6 +567,53 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  {/* Image Upload Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Hostel Images</label>
+
+                    {/* Existing Images */}
+                    {formData.images && formData.images.length > 0 && (
+                      <div className="mb-4 grid grid-cols-4 gap-2">
+                        {formData.images.map((url, idx) => (
+                          <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200">
+                            <img src={url} alt={`Hostel ${idx}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeExistingImage(idx)}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* File Input */}
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:bg-gray-50 transition-colors cursor-pointer relative">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className="space-y-1 text-center">
+                        <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                        <div className="flex text-sm text-gray-600 justify-center">
+                          <span className="font-medium text-blue-600 hover:text-blue-500">Upload images</span>
+                          <p className="pl-1">or drag and drop</p>
+                        </div>
+                        <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                        {selectedFiles.length > 0 && (
+                          <div className="mt-2 text-sm text-green-600 font-medium">
+                            {selectedFiles.length} files selected
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-3 pt-4 mt-2">
                     <button
                       type="button"
@@ -534,15 +624,20 @@ export default function AdminDashboard() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                      className="relative px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                     >
                       {isEditMode ? 'Update' : 'Save'}
+                      {uploading && (
+                        <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg z-20">
+                          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                        </div>
+                      )}
                     </button>
                   </div>
                 </form>
               </div>
             </div>
-          </div>
+          </div >
         )
       }
 
